@@ -569,11 +569,6 @@
           margin-top: 6px;
       }
       
-      /* CAMBIO CLAVE: Las polaroids ahora flotan ENCIMA de la tarjeta principal en móvil */
-      .polaroids {
-          z-index: 11; /* Mayor que mainCard (9) y titleWrap (10) */
-      }
-      
       /* Control de música más pequeño */
       .musicCtrl{
           bottom: 10px;
@@ -619,13 +614,19 @@
   </button>
   
   <!-- Audio Elements -->
-  <!-- 'musica.mp3' debe ser la canción de fondo -->
   <audio id="bgMusic" loop>
       <source src="musica.mp3" type="audio/mp3">
   </audio>
-  <!-- 'click.mp3' debe ser un sonido corto tipo pop o campana -->
+  
+  <!-- Random Click Sounds -->
   <audio id="clickSound">
       <source src="click.mp3" type="audio/mp3">
+  </audio>
+  <audio id="clickSound2">
+      <source src="click2.mp3" type="audio/mp3">
+  </audio>
+  <audio id="clickSound3">
+      <source src="click3.mp3" type="audio/mp3">
   </audio>
 
   <div class="hero" aria-hidden="true">
@@ -710,7 +711,13 @@
     
     // Audio Elements
     const bgMusic = document.getElementById("bgMusic");
-    const clickSound = document.getElementById("clickSound");
+    // Array of click sounds for random selection
+    const clickSounds = [
+        document.getElementById("clickSound"),
+        document.getElementById("clickSound2"),
+        document.getElementById("clickSound3")
+    ];
+    
     const musicBtn = document.getElementById("musicBtn");
     const musicIcon = document.getElementById("musicIcon");
     const musicText = document.getElementById("musicText");
@@ -719,7 +726,7 @@
 
     // Volumen inicial (suave)
     bgMusic.volume = 0.4;
-    clickSound.volume = 0.6;
+    clickSounds.forEach(s => s.volume = 0.6);
 
     // --- CAROUSEL LOGIC ---
     let currentIndex = 0;
@@ -1038,9 +1045,13 @@
     }
 
     function playClickSound(){
-        // Reiniciar el sonido para que se pueda tocar rápido
-        clickSound.currentTime = 0;
-        clickSound.play().catch(e => {}); // Ignorar errores si no hay interacción previa
+        // Play random click sound
+        const randIndex = Math.floor(Math.random() * clickSounds.length);
+        const sound = clickSounds[randIndex];
+        
+        // Reset current time to allow rapid re-playing
+        sound.currentTime = 0;
+        sound.play().catch(e => {}); 
     }
 
     // Intentar habilitar audio en la primera interacción global (si no empezó con el botón de intro)
