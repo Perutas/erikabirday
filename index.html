@@ -259,6 +259,7 @@
       box-shadow: var(--shadow);
       transform: translateZ(0);
       transition: transform 0.3s ease;
+      z-index: 9;
     }
 
     /* relleno blur interno */
@@ -539,6 +540,11 @@
           margin-top: 6px;
       }
       
+      /* CAMBIO CLAVE: Las polaroids ahora flotan ENCIMA de la tarjeta principal en móvil */
+      .polaroids {
+          z-index: 11; /* Mayor que mainCard (9) y titleWrap (10) */
+      }
+      
       /* Control de música más pequeño */
       .musicCtrl{
           bottom: 10px;
@@ -706,6 +712,7 @@
     function generateRingSlots(count){
       const w = window.innerWidth;
       const h = window.innerHeight;
+      const isMobile = w < 620;
 
       const main = document.getElementById("mainCard");
       const header = document.querySelector(".titleWrap");
@@ -718,20 +725,17 @@
       const headRect = header ? header.getBoundingClientRect() : { bottom: 90 };
 
       // Tamaño estimado de polaroid (ancho) + un poco de margen
-      // Ajuste responsivo manual si no lo coge CSS a tiempo
-      let polBase = (w < 620) ? 120 : 180;
+      let polBase = isMobile ? 120 : 180;
       const polW = Math.min(Math.max(w * 0.18, polBase), 230);
       const polH = polW * 0.75 + 62;
 
-      // Aumentar margen superior para evitar aglomeración con el título
-      const titleBuffer = (w < 620) ? 40 : 10; 
       const marginX = polW/2 + 10;
-      const marginTop = headRect.bottom + polH/2 + titleBuffer;
-      const marginBottom = polH/2 + 20;
+      const marginTop = headRect.bottom + polH/2 + 10;
+      const marginBottom = polH/2 + 10;
 
-      // Área de exclusión más tolerante en móvil
-      // Aumentamos el área de protección alrededor de la foto central para que no se encimen
-      const padScale = (w < 620) ? 0.65 : 0.70; // Aumentar en móvil para separar más del centro
+      // Área de exclusión
+      // En móvil, reducimos MUCHO el margen para permitir que las polaroids se acerquen o cubran la foto
+      const padScale = isMobile ? 0.05 : 0.55; 
       const pad = Math.max(polW, polH) * padScale;
       
       const ex = {
@@ -744,9 +748,12 @@
       const cx = (rect.left + rect.right) / 2;
       const cy = (rect.top + rect.bottom) / 2;
 
-      // Empujamos las fotos más hacia afuera para que se vean más
-      const minR = Math.max(rect.width, rect.height) * ((w < 620) ? 0.65 : 0.75) + pad * 0.2;
-      const maxR = Math.max(minR + 100, Math.min(w, h) * 0.95);
+      // Distancia mínima de colisión entre fotos para que no se tapen
+      const minDist = isMobile ? 100 : 160;
+
+      // Definir área de spawn
+      const minR = Math.max(rect.width, rect.height) * (isMobile ? 0.3 : 0.55) + pad * 0.2;
+      const maxR = Math.min(w, h) * 0.95;
 
       const slots = [];
       const step = (Math.PI * 2) / count;
@@ -754,8 +761,10 @@
       for (let i = 0; i < count; i++){
         let placed = false;
         
-        for (let t = 0; t < 50; t++){
-          const angle = (i * step) + rand(-0.4, 0.4); 
+        // Intentos para encontrar hueco sin colisión
+        for (let t = 0; t < 150; t++){
+          // Angulo aleatorio general o sectorizado
+          const angle = (i * step) + rand(-0.8, 0.8); 
           const r = rand(minR, maxR);
 
           let x = cx + Math.cos(angle) * r;
@@ -764,15 +773,34 @@
           x = clamp(x, marginX, w - marginX);
           y = clamp(y, marginTop, h - marginBottom);
 
-          const insideMain =
-            x > ex.x0 && x < ex.x1 &&
-            y > ex.y0 && y < ex.y1;
+          // En móvil, si estamos en modo "encima", permitimos estar dentro del rect principal
+          // Solo evitamos el centro exacto si queremos ver la cara de la foto principal
+          // Pero si es "encima", podemos ignorar insideMain para más libertad
+          if (!isMobile) {
+              const insideMain =
+                x > ex.x0 && x < ex.x1 &&
+                y > ex.y0 && y < ex.y1;
+              if (insideMain) continue;
+          }
 
-          if (insideMain) continue;
+          // **NUEVO: Check de colisión con otras polaroids**
+          let overlap = false;
+          for (const s of slots) {
+              const dx = s.rawX - x;
+              const dy = s.rawY - y;
+              const dist = Math.sqrt(dx*dx + dy*dy);
+              if (dist < minDist) {
+                  overlap = true;
+                  break;
+              }
+          }
+          if (overlap) continue;
 
           slots.push({
             left: (x / w * 100).toFixed(2) + "vw",
             top:  (y / h * 100).toFixed(2) + "vh",
+            rawX: x,
+            rawY: y
           });
 
           placed = true;
@@ -780,18 +808,14 @@
         }
 
         if (!placed){
-          // Fallback slots más abiertos para móvil
-          // Distribuir mejor verticalmente
+          // Fallback simple si no cabe
           const corners = [
-            { left:"10vw", top:"18vh" }, // Un poco más abajo
-            { left:"90vw", top:"18vh" },
-            { left:"10vw", top:"82vh" },
-            { left:"90vw", top:"82vh" },
-            // Agregar puntos medios laterales si es necesario
-            { left:"5vw", top:"50vh" },
-            { left:"95vw", top:"50vh" } 
+            { left:"10vw", top:"20vh" },
+            { left:"90vw", top:"20vh" },
+            { left:"10vw", top:"80vh" },
+            { left:"90vw", top:"80vh" },
           ];
-          slots.push(corners[i % corners.length]);
+          slots.push(corners[i % 4]);
         }
       }
 
