@@ -285,7 +285,36 @@
       object-position: 50% 50%;
       background: rgba(0,0,0,.20);
       display:block;
+      cursor: pointer; /* Indicar que se puede abrir */
     }
+
+    /* Navegación Carrusel */
+    .navBtn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 1002; /* Muy alto para que funcione incluso con polaroids encima */
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: white;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 20px;
+      transition: all 0.2s;
+      backdrop-filter: blur(4px);
+    }
+    .navBtn:hover {
+      background: rgba(255, 77, 109, 0.8);
+      transform: translateY(-50%) scale(1.1);
+    }
+    .navBtn.prev { left: 10px; }
+    .navBtn.next { right: 10px; }
+
 
     .captionBar{
       position:absolute;
@@ -601,12 +630,16 @@
 
   <div class="hero" aria-hidden="true">
     <div class="mainCard" id="mainCard">
+      <!-- Botones del Carrusel -->
+      <button class="navBtn prev" id="prevBtn" aria-label="Anterior">‹</button>
+      <button class="navBtn next" id="nextBtn" aria-label="Siguiente">›</button>
+
       <!-- Se llenará con JS dependiendo del modo (Demo o Local) -->
       <img class="mainImage" id="mainImageEl" src="" alt="Foto principal de Erika" decoding="async" />
       <div class="captionBar">
         <div class="capLeft">
           <div class="tag">ERIKA</div>
-          <div class="capText">¡Feliz vuelta al sol! 🥳</div>
+          <div class="capText" id="mainCaption">¡Feliz vuelta al sol! 🥳</div>
         </div>
         <div class="dots" aria-hidden="true">
           <span class="dot c1"></span><span class="dot c2"></span><span class="dot c3"></span>
@@ -637,7 +670,7 @@
 
     // Configuración Local
     const TOTAL_LOCAL = 12; // Cantidad de fotos si usas tus archivos
-    const MAIN_BG_NUM = 8;  // El número de la foto principal (ej: 8.jpeg)
+    const MAIN_BG_NUM = 8;  // El número de la foto principal (ej: 8.jpeg) - Será el inicio del carrusel
     const IMG_EXT = "jpeg";
 
     // URLs de Demo (Se ignoran si USE_DEMO_IMAGES = false)
@@ -670,6 +703,9 @@
     const lbTitle = document.getElementById("lbTitle");
     const lbCloseBtn = document.getElementById("lbCloseBtn");
     const mainImageEl = document.getElementById("mainImageEl");
+    const mainCaption = document.getElementById("mainCaption");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
     const bgLayer = document.getElementById("bgLayer");
     
     // Audio Elements
@@ -685,6 +721,80 @@
     bgMusic.volume = 0.4;
     clickSound.volume = 0.6;
 
+    // --- CAROUSEL LOGIC ---
+    let currentIndex = 0;
+    let imageList = []; // Array of objects {src, msg}
+
+    function initImageList() {
+        if (USE_DEMO_IMAGES) {
+            // Add main demo
+            imageList.push({ src: DEMO_MAIN, msg: "¡Feliz vuelta al sol! 🥳" });
+            // Add other demos
+            DEMO_PICS.forEach((url, i) => {
+                imageList.push({ src: url, msg: greetings[i % greetings.length] });
+            });
+        } else {
+            // Local files: 1 to TOTAL_LOCAL
+            // We want the MAIN_BG_NUM to be first
+            imageList.push({ 
+                src: `${MAIN_BG_NUM}.${IMG_EXT}`, 
+                msg: "¡Feliz vuelta al sol! 🥳" 
+            });
+            for (let i = 1; i <= TOTAL_LOCAL; i++) {
+                if (i !== MAIN_BG_NUM) {
+                    imageList.push({ 
+                        src: `${i}.${IMG_EXT}`, 
+                        msg: greetings[(i-1) % greetings.length] 
+                    });
+                }
+            }
+        }
+    }
+
+    function updateCarousel(index) {
+        if (index < 0) index = imageList.length - 1;
+        if (index >= imageList.length) index = 0;
+        currentIndex = index;
+
+        const item = imageList[currentIndex];
+        
+        // Update Main Image
+        mainImageEl.style.opacity = '0';
+        setTimeout(() => {
+            mainImageEl.src = item.src;
+            mainCaption.textContent = item.msg;
+            mainImageEl.style.opacity = '1';
+        }, 150); // Small fade effect
+
+        // Update BG Blur
+        // We need to inject style again or update the stylesheet
+        const bgStyle = document.getElementById('dynamicBgStyle');
+        if(bgStyle) {
+            bgStyle.innerHTML = `
+                .bg::before { background-image: url("${item.src}"); }
+                .mainCard::before { background-image: url("${item.src}"); }
+            `;
+        }
+    }
+
+    prevBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        playClickSound();
+        updateCarousel(currentIndex - 1);
+    });
+
+    nextBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        playClickSound();
+        updateCarousel(currentIndex + 1);
+    });
+
+    // Clicking main image opens lightbox (full screen detail)
+    mainImageEl.addEventListener('click', () => {
+        openLightbox(imageList[currentIndex].src, imageList[currentIndex].msg);
+    });
+
+
     function rand(min, max){ return Math.random() * (max - min) + min; }
     function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
 
@@ -698,10 +808,15 @@
     }
 
     function setupMainImages() {
-      const mainSrc = getImageUrl(USE_DEMO_IMAGES ? 'main' : MAIN_BG_NUM);
+      // Initialize Image List for Carousel
+      initImageList();
+      
+      // Setup initial styles
+      const mainSrc = imageList[0].src;
       mainImageEl.src = mainSrc;
       
       const dynamicStyles = document.createElement('style');
+      dynamicStyles.id = 'dynamicBgStyle';
       dynamicStyles.innerHTML = `
         .bg::before { background-image: url("${mainSrc}"); }
         .mainCard::before { background-image: url("${mainSrc}"); }
@@ -734,7 +849,6 @@
       const marginBottom = polH/2 + 10;
 
       // Área de exclusión
-      // En móvil, reducimos MUCHO el margen para permitir que las polaroids se acerquen o cubran la foto
       const padScale = isMobile ? 0.05 : 0.55; 
       const pad = Math.max(polW, polH) * padScale;
       
@@ -763,7 +877,6 @@
         
         // Intentos para encontrar hueco sin colisión
         for (let t = 0; t < 150; t++){
-          // Angulo aleatorio general o sectorizado
           const angle = (i * step) + rand(-0.8, 0.8); 
           const r = rand(minR, maxR);
 
@@ -773,9 +886,6 @@
           x = clamp(x, marginX, w - marginX);
           y = clamp(y, marginTop, h - marginBottom);
 
-          // En móvil, si estamos en modo "encima", permitimos estar dentro del rect principal
-          // Solo evitamos el centro exacto si queremos ver la cara de la foto principal
-          // Pero si es "encima", podemos ignorar insideMain para más libertad
           if (!isMobile) {
               const insideMain =
                 x > ex.x0 && x < ex.x1 &&
@@ -783,7 +893,6 @@
               if (insideMain) continue;
           }
 
-          // **NUEVO: Check de colisión con otras polaroids**
           let overlap = false;
           for (const s of slots) {
               const dx = s.rawX - x;
@@ -808,7 +917,6 @@
         }
 
         if (!placed){
-          // Fallback simple si no cabe
           const corners = [
             { left:"10vw", top:"20vh" },
             { left:"90vw", top:"20vh" },
@@ -825,6 +933,10 @@
     function buildPolaroids(){
       polaroidsEl.innerHTML = "";
 
+      // Only generate polaroids for images that aren't the initial main one?
+      // Or duplicate them all as decoration? Let's use the list of indices excluding main for decoration
+      // But if user clicks them, we want to jump to that image in carousel.
+      
       let indices = [];
       if (USE_DEMO_IMAGES) {
         indices = Array.from({length: TOTAL_LOCAL}, (_, i) => i);
@@ -856,8 +968,9 @@
         
         btn.style.zIndex = String(20 + i);
 
+        const imgSrc = getImageUrl(idxRef);
         const img = document.createElement("img");
-        img.src = getImageUrl(idxRef);
+        img.src = imgSrc;
         img.alt = `Foto recuerdo`;
         img.loading = (i < 6) ? "eager" : "lazy";
         img.decoding = "async";
@@ -878,9 +991,18 @@
         btn.appendChild(img);
         btn.appendChild(label);
 
+        // Click on polaroid: Find this image in the carousel list and jump to it
         btn.addEventListener("click", () => {
             playClickSound();
-            openLightbox(img.src, msg);
+            
+            // Find index in carousel
+            const targetIdx = imageList.findIndex(item => item.src === imgSrc);
+            if(targetIdx !== -1) {
+                updateCarousel(targetIdx);
+            } else {
+                // Fallback (shouldn't happen)
+                openLightbox(img.src, msg);
+            }
         });
         
         btn.addEventListener("mouseenter", () => {
