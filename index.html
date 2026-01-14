@@ -723,12 +723,15 @@
       const polW = Math.min(Math.max(w * 0.18, polBase), 230);
       const polH = polW * 0.75 + 62;
 
+      // Aumentar margen superior para evitar aglomeración con el título
+      const titleBuffer = (w < 620) ? 40 : 10; 
       const marginX = polW/2 + 10;
-      const marginTop = headRect.bottom + polH/2 + 10;
-      const marginBottom = polH/2 + 10;
+      const marginTop = headRect.bottom + polH/2 + titleBuffer;
+      const marginBottom = polH/2 + 20;
 
       // Área de exclusión más tolerante en móvil
-      const padScale = (w < 620) ? 0.35 : 0.55; 
+      // Aumentamos el área de protección alrededor de la foto central para que no se encimen
+      const padScale = (w < 620) ? 0.65 : 0.70; // Aumentar en móvil para separar más del centro
       const pad = Math.max(polW, polH) * padScale;
       
       const ex = {
@@ -741,8 +744,9 @@
       const cx = (rect.left + rect.right) / 2;
       const cy = (rect.top + rect.bottom) / 2;
 
-      const minR = Math.max(rect.width, rect.height) * 0.55 + pad * 0.2;
-      const maxR = Math.min(w, h) * 0.85;
+      // Empujamos las fotos más hacia afuera para que se vean más
+      const minR = Math.max(rect.width, rect.height) * ((w < 620) ? 0.65 : 0.75) + pad * 0.2;
+      const maxR = Math.max(minR + 100, Math.min(w, h) * 0.95);
 
       const slots = [];
       const step = (Math.PI * 2) / count;
@@ -777,13 +781,17 @@
 
         if (!placed){
           // Fallback slots más abiertos para móvil
+          // Distribuir mejor verticalmente
           const corners = [
-            { left:"15vw", top:"20vh" },
-            { left:"85vw", top:"20vh" },
-            { left:"15vw", top:"80vh" },
-            { left:"85vw", top:"80vh" },
+            { left:"10vw", top:"18vh" }, // Un poco más abajo
+            { left:"90vw", top:"18vh" },
+            { left:"10vw", top:"82vh" },
+            { left:"90vw", top:"82vh" },
+            // Agregar puntos medios laterales si es necesario
+            { left:"5vw", top:"50vh" },
+            { left:"95vw", top:"50vh" } 
           ];
-          slots.push(corners[i % 4]);
+          slots.push(corners[i % corners.length]);
         }
       }
 
